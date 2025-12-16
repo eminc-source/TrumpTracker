@@ -467,7 +467,6 @@
         .source-badge[data-source="NAR"] { background: #c62828; }
         .source-badge[data-source="Census"] { background: #6a1b9a; }
         .source-badge[data-source="Congress.gov"] { background: #1565c0; }
-        .source-badge[data-source="Metals.live"] { background: #ffd700; color: #000; }
         .source-badge[data-source="CoinGecko"] { background: #8dc647; color: #000; }
         .source-badge[data-source="CoreLogic"] { background: #e65100; }
     </style>
@@ -864,6 +863,10 @@
             
             // Market Volatility
             VIXCLS: 'vix',                     // VIX Volatility Index
+            
+            // Precious Metals (FRED has London Fixing Prices)
+            GOLDAMGBD228NLBM: 'goldPrice',    // Gold Fixing Price (London)
+            SLVPRUSD: 'silverPrice',          // Silver Fixing Price (London)
         };
 
         // CoinGecko Crypto IDs
@@ -890,27 +893,6 @@
             }
         }
         
-        // Fetch precious metals from Metal Price API (using free public endpoint)
-        async function fetchMetalPrices() {
-            try {
-                // Using metals.live free endpoint
-                const url = 'https://api.metals.live/v1/spot';
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`Metals API error: ${response.status}`);
-                const data = await response.json();
-                // metals.live returns array with gold, silver, platinum, palladium
-                return {
-                    gold: data.find(m => m.metal === 'gold')?.price || null,
-                    silver: data.find(m => m.metal === 'silver')?.price || null,
-                    platinum: data.find(m => m.metal === 'platinum')?.price || null,
-                    source: 'Metals.live'
-                };
-            } catch (error) {
-                console.warn('Metals fetch failed:', error.message);
-                return null;
-            }
-        }
-
         // Data Source Links - Maps data names to their source URLs
         const DATA_SOURCES = {
             // Housing Metrics
@@ -1028,9 +1010,8 @@
             "Financial Stress Index": { url: "https://fred.stlouisfed.org/series/STLFSI4", source: "FRED" },
             
             // Investments
-            "Gold": { url: "https://metals.live/", source: "Metals.live" },
-            "Silver": { url: "https://metals.live/", source: "Metals.live" },
-            "Platinum": { url: "https://metals.live/", source: "Metals.live" },
+            "Gold": { url: "https://fred.stlouisfed.org/series/GOLDAMGBD228NLBM", source: "FRED" },
+            "Silver": { url: "https://fred.stlouisfed.org/series/SLVPRUSD", source: "FRED" },
             "S&P 500": { url: "https://fred.stlouisfed.org/series/SP500", source: "FRED" },
             "Dow Jones": { url: "https://fred.stlouisfed.org/series/DJIA", source: "FRED" },
             "Bitcoin": { url: "https://www.coingecko.com/en/coins/bitcoin", source: "CoinGecko" },
@@ -1168,20 +1149,11 @@
             // Fetch crypto prices
             const cryptoPromise = fetchCryptoPrices();
             
-            // Fetch metal prices
-            const metalsPromise = fetchMetalPrices();
-            
             await Promise.all([...fredPromises, 
                 cryptoPromise.then(data => {
                     if (data) {
                         liveData.crypto = data;
-                        liveData.cryptoCount = 6;
-                    }
-                }),
-                metalsPromise.then(data => {
-                    if (data) {
-                        liveData.metals = data;
-                        liveData.metalsCount = 3;
+                        liveData.cryptoCount = 4;
                     }
                 })
             ]);
@@ -1193,7 +1165,7 @@
                 liveData.sheetCount = 1;
             }
             
-            console.log(`✅ Live data fetched: ${liveData.fredCount} FRED, ${liveData.cryptoCount} crypto, ${liveData.metalsCount || 0} metals, ${liveData.sheetCount} sheet`);
+            console.log(`✅ Live data fetched: ${liveData.fredCount} FRED series, ${liveData.cryptoCount} crypto, ${liveData.sheetCount} sheet`);
             return liveData;
         }
 
@@ -1794,24 +1766,21 @@
                 }
             }
             
-            // Update precious metals
-            if (liveData.metals) {
-                const metalsMap = {
-                    gold: 'Gold',
-                    silver: 'Silver',
-                    platinum: 'Platinum'
-                };
-                
-                Object.entries(metalsMap).forEach(([key, name]) => {
-                    const price = liveData.metals[key];
-                    if (price) {
-                        const investment = dashboardData.investments.find(i => i.name === name);
-                        if (investment) {
-                            investment.value = '$' + price.toLocaleString(undefined, { maximumFractionDigits: 2 });
-                            investment.liveSource = 'Metals.live';
-                        }
-                    }
-                });
+            // Update precious metals from FRED
+            if (liveData.goldPrice) {
+                const investment = dashboardData.investments.find(i => i.name === 'Gold');
+                if (investment) {
+                    investment.value = '$' + liveData.goldPrice.current.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                    investment.liveSource = 'FRED';
+                }
+            }
+            
+            if (liveData.silverPrice) {
+                const investment = dashboardData.investments.find(i => i.name === 'Silver');
+                if (investment) {
+                    investment.value = '$' + liveData.silverPrice.current.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                    investment.liveSource = 'FRED';
+                }
             }
             
             console.log('📊 Dashboard updated with live data');
@@ -1989,7 +1958,6 @@
             investments: [
                 { name: "Gold", value: "$395.44", momChange: "+1.9%", yoyChange: "+53.2%" },
                 { name: "Silver", value: "$56.10", momChange: "+9.5%", yoyChange: "+95.3%" },
-                { name: "Platinum", value: "$159.00", momChange: "+4.2%", yoyChange: "+79.2%" },
                 { name: "S&P 500", value: "$6,827", momChange: "-0.3%", yoyChange: "+12.5%" },
                 { name: "Dow Jones", value: "$485.40", momChange: "+1.7%", yoyChange: "+8.2%" },
                 { name: "Bitcoin", value: "$88,172", momChange: "-3.0%", yoyChange: "-16.3%" },
