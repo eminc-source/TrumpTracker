@@ -628,6 +628,7 @@
     <div class="tabs">
         <button class="tab-btn active" onclick="switchView('metrics')">Housing Metrics</button>
         <button class="tab-btn" onclick="switchView('costs')">Cost Trackers</button>
+        <button class="tab-btn" onclick="switchView('crash')">Crash Tracker</button>
         <button class="tab-btn" onclick="switchView('regional')">Regional</button>
         <button class="tab-btn" onclick="switchView('investments')">Investments</button>
         <button class="tab-btn" onclick="switchView('economic')">Economic Index</button>
@@ -775,25 +776,25 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="card">
-            <div class="section-title"><span>📉</span> Crash Likelihood Tracker</div>
-            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 15px;">
-                Macroeconomic pressure points based on 15 leading indicators.
-            </p>
-            <div class="table-wrapper">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Variable</th>
-                        <th>Current</th>
-                        <th>Points</th>
-                        <th>Risk Level</th>
-                    </tr>
-                </thead>
-                <tbody id="crashTrackerBody"></tbody>
-            </table>
+            <div id="crashView" style="display:none;">
+                <div class="section-title"><span>📉</span> Crash Likelihood Tracker</div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 15px;">
+                    Macroeconomic pressure points based on 15 leading indicators.
+                </p>
+                <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Variable</th>
+                            <th>Current</th>
+                            <th>Points</th>
+                            <th>Risk Level</th>
+                        </tr>
+                    </thead>
+                    <tbody id="crashTrackerBody"></tbody>
+                </table>
+                </div>
             </div>
         </div>
     </div>
@@ -2521,6 +2522,7 @@
             document.getElementById('regionalView').style.display = 'none';
             document.getElementById('investmentsView').style.display = 'none';
             document.getElementById('economicView').style.display = 'none';
+            document.getElementById('crashView').style.display = 'none';
             
             // Show selected
             document.getElementById(viewName + 'View').style.display = 'block';
