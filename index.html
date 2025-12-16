@@ -41,10 +41,18 @@
         @media (max-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr; } }
 
         /* Tables */
-        .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .data-table th { text-align: left; color: var(--text-secondary); font-size: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
-        .data-table td { padding: 12px 0; border-bottom: 1px solid #33415540; font-size: 14px; }
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; min-width: 500px; }
+        .data-table th { text-align: left; color: var(--text-secondary); font-size: 12px; padding: 10px 6px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+        .data-table td { padding: 12px 6px; border-bottom: 1px solid #33415540; font-size: 14px; }
         .data-table .trend { font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+        @media (max-width: 600px) {
+            .data-table { min-width: 450px; }
+            .data-table th { font-size: 11px; padding: 8px 4px; }
+            .data-table td { font-size: 12px; padding: 10px 4px; }
+            .data-table .trend { font-size: 10px; padding: 2px 6px; }
+            .source-badge { font-size: 8px; padding: 2px 4px; }
+        }
         
         .trend-up { color: var(--accent-red); background: #450a0a; } /* Cost going up is bad usually */
         .trend-down { color: var(--accent-green); background: #052e16; } /* Cost going down is good */
@@ -630,6 +638,7 @@
         <div class="card">
             <div id="metricsView">
                 <div class="section-title"><span>🏠</span> Market Health Indicators</div>
+                <div class="table-wrapper">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -642,10 +651,12 @@
                     </thead>
                     <tbody id="housingMetricsBody"></tbody>
                 </table>
+                </div>
             </div>
 
             <div id="costsView" style="display:none;">
                 <div class="section-title"><span>🔨</span> Builder & Household Expenses</div>
+                <div class="table-wrapper">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -658,10 +669,12 @@
                     </thead>
                     <tbody id="costTrackerBody"></tbody>
                 </table>
+                </div>
             </div>
 
             <div id="legislationView" style="display:none;">
                 <div class="section-title"><span>⚖️</span> Bill Tracker</div>
+                <div class="table-wrapper">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -672,11 +685,13 @@
                     </thead>
                     <tbody id="billTrackerBody"></tbody>
                 </table>
+                </div>
             </div>
 
             <div id="regionalView" style="display:none;">
                 <div class="section-title"><span>🗺️</span> Affordability by Region</div>
                 <div class="regional-grid" id="regionalContainer"></div>
+                <div class="table-wrapper">
                 <table class="data-table" style="margin-top: 20px;">
                     <thead>
                         <tr>
@@ -691,6 +706,7 @@
                     </thead>
                     <tbody id="regionalTableBody"></tbody>
                 </table>
+                </div>
             </div>
 
             <div id="investmentsView" style="display:none;">
@@ -699,6 +715,7 @@
                 <div class="investments-grid">
                     <div class="investment-section">
                         <h4>💰 Commodities & Markets</h4>
+                        <div class="table-wrapper">
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -710,9 +727,11 @@
                             </thead>
                             <tbody id="assetsTableBody"></tbody>
                         </table>
+                        </div>
                     </div>
                     <div class="investment-section">
                         <h4>🏦 Treasury Yields</h4>
+                        <div class="table-wrapper">
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -724,6 +743,7 @@
                             </thead>
                             <tbody id="yieldsTableBody"></tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -762,6 +782,7 @@
             <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 15px;">
                 Macroeconomic pressure points based on 15 leading indicators.
             </p>
+            <div class="table-wrapper">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -773,6 +794,7 @@
                 </thead>
                 <tbody id="crashTrackerBody"></tbody>
             </table>
+            </div>
         </div>
     </div>
 
