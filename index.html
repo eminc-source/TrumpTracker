@@ -468,6 +468,7 @@
         .source-badge[data-source="Census"] { background: #6a1b9a; }
         .source-badge[data-source="Congress.gov"] { background: #1565c0; }
         .source-badge[data-source="CoinGecko"] { background: #8dc647; color: #000; }
+        .source-badge[data-source="Yahoo"] { background: #6001d2; }
         .source-badge[data-source="CoreLogic"] { background: #e65100; }
     </style>
 </head>
@@ -861,12 +862,8 @@
             CSUSHPINSA: 'caseShiller',         // Case-Shiller Home Price Index
             HOUST: 'housingStarts',            // Housing Starts (thousands)
             
-            // Market Volatility
-            VIXCLS: 'vix',                     // VIX Volatility Index
-            
-            // Precious Metals (FRED has London Fixing Prices)
-            GOLDAMGBD228NLBM: 'goldPrice',    // Gold Fixing Price (London)
-            SLVPRUSD: 'silverPrice',          // Silver Fixing Price (London)
+            // Market Volatility - moved to Yahoo Finance for real-time
+            // VIX, Gold, Silver, Platinum, S&P 500, Dow Jones now from Yahoo
         };
 
         // CoinGecko Crypto IDs
@@ -891,6 +888,43 @@
                 console.warn('CoinGecko fetch failed:', error.message);
                 return null;
             }
+        }
+        
+        // Yahoo Finance symbols for market data
+        const YAHOO_SYMBOLS = {
+            'GC=F': 'gold',           // Gold Futures
+            'SI=F': 'silver',         // Silver Futures
+            'PL=F': 'platinum',       // Platinum Futures
+            '^GSPC': 'sp500',         // S&P 500
+            '^DJI': 'dowJones',       // Dow Jones
+            '^VIX': 'vix'             // VIX Volatility
+        };
+        
+        // Fetch market data from Yahoo Finance (free, no API key needed)
+        async function fetchYahooFinance() {
+            const results = {};
+            
+            for (const [symbol, key] of Object.entries(YAHOO_SYMBOLS)) {
+                try {
+                    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Yahoo API error: ${response.status}`);
+                    const data = await response.json();
+                    const meta = data.chart?.result?.[0]?.meta;
+                    if (meta && meta.regularMarketPrice) {
+                        results[key] = {
+                            current: meta.regularMarketPrice,
+                            previousClose: meta.previousClose || meta.chartPreviousClose,
+                            change: meta.regularMarketPrice - (meta.previousClose || meta.chartPreviousClose),
+                            changePercent: ((meta.regularMarketPrice - (meta.previousClose || meta.chartPreviousClose)) / (meta.previousClose || meta.chartPreviousClose) * 100)
+                        };
+                    }
+                } catch (error) {
+                    console.warn(`Yahoo Finance fetch failed for ${symbol}:`, error.message);
+                }
+            }
+            
+            return Object.keys(results).length > 0 ? results : null;
         }
         
         // Data Source Links - Maps data names to their source URLs
@@ -1010,8 +1044,12 @@
             "Financial Stress Index": { url: "https://fred.stlouisfed.org/series/STLFSI4", source: "FRED" },
             
             // Investments
-            "Gold": { url: "https://fred.stlouisfed.org/series/GOLDAMGBD228NLBM", source: "FRED" },
-            "Silver": { url: "https://fred.stlouisfed.org/series/SLVPRUSD", source: "FRED" },
+            "Gold": { url: "https://finance.yahoo.com/quote/GC=F", source: "Yahoo" },
+            "Silver": { url: "https://finance.yahoo.com/quote/SI=F", source: "Yahoo" },
+            "Platinum": { url: "https://finance.yahoo.com/quote/PL=F", source: "Yahoo" },
+            "S&P 500": { url: "https://finance.yahoo.com/quote/%5EGSPC", source: "Yahoo" },
+            "Dow Jones": { url: "https://finance.yahoo.com/quote/%5EDJI", source: "Yahoo" },
+            "VIX (Volatility)": { url: "https://finance.yahoo.com/quote/%5EVIX", source: "Yahoo" },
             "S&P 500": { url: "https://fred.stlouisfed.org/series/SP500", source: "FRED" },
             "Dow Jones": { url: "https://fred.stlouisfed.org/series/DJIA", source: "FRED" },
             "Bitcoin": { url: "https://www.coingecko.com/en/coins/bitcoin", source: "CoinGecko" },
@@ -1149,11 +1187,20 @@
             // Fetch crypto prices
             const cryptoPromise = fetchCryptoPrices();
             
+            // Fetch Yahoo Finance data (metals, indices, VIX)
+            const yahooPromise = fetchYahooFinance();
+            
             await Promise.all([...fredPromises, 
                 cryptoPromise.then(data => {
                     if (data) {
                         liveData.crypto = data;
                         liveData.cryptoCount = 4;
+                    }
+                }),
+                yahooPromise.then(data => {
+                    if (data) {
+                        liveData.yahoo = data;
+                        liveData.yahooCount = Object.keys(data).length;
                     }
                 })
             ]);
@@ -1165,7 +1212,7 @@
                 liveData.sheetCount = 1;
             }
             
-            console.log(`✅ Live data fetched: ${liveData.fredCount} FRED series, ${liveData.cryptoCount} crypto, ${liveData.sheetCount} sheet`);
+            console.log(`✅ Live data fetched: ${liveData.fredCount} FRED, ${liveData.cryptoCount} crypto, ${liveData.yahooCount || 0} Yahoo, ${liveData.sheetCount} sheet`);
             return liveData;
         }
 
@@ -1748,38 +1795,96 @@
                 });
             }
             
-            // Update VIX (market volatility)
-            if (liveData.vix) {
-                // Add VIX to investments if not exists
-                let vixInvestment = dashboardData.investments.find(i => i.name === 'VIX (Volatility)');
-                if (!vixInvestment) {
-                    dashboardData.investments.push({
-                        name: 'VIX (Volatility)',
-                        value: liveData.vix.current.toFixed(2),
-                        momChange: 'N/A',
-                        yoyChange: 'N/A',
-                        liveSource: 'FRED'
-                    });
-                } else {
-                    vixInvestment.value = liveData.vix.current.toFixed(2);
-                    vixInvestment.liveSource = 'FRED';
+            // Update from Yahoo Finance (metals, indices, VIX)
+            if (liveData.yahoo) {
+                // Gold
+                if (liveData.yahoo.gold) {
+                    const investment = dashboardData.investments.find(i => i.name === 'Gold');
+                    if (investment) {
+                        investment.value = '$' + liveData.yahoo.gold.current.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                        if (liveData.yahoo.gold.changePercent !== undefined) {
+                            investment.momChange = (liveData.yahoo.gold.changePercent >= 0 ? '+' : '') + liveData.yahoo.gold.changePercent.toFixed(1) + '%';
+                        }
+                        investment.liveSource = 'Yahoo';
+                    }
                 }
-            }
-            
-            // Update precious metals from FRED
-            if (liveData.goldPrice) {
-                const investment = dashboardData.investments.find(i => i.name === 'Gold');
-                if (investment) {
-                    investment.value = '$' + liveData.goldPrice.current.toLocaleString(undefined, { maximumFractionDigits: 2 });
-                    investment.liveSource = 'FRED';
+                
+                // Silver
+                if (liveData.yahoo.silver) {
+                    const investment = dashboardData.investments.find(i => i.name === 'Silver');
+                    if (investment) {
+                        investment.value = '$' + liveData.yahoo.silver.current.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                        if (liveData.yahoo.silver.changePercent !== undefined) {
+                            investment.momChange = (liveData.yahoo.silver.changePercent >= 0 ? '+' : '') + liveData.yahoo.silver.changePercent.toFixed(1) + '%';
+                        }
+                        investment.liveSource = 'Yahoo';
+                    }
                 }
-            }
-            
-            if (liveData.silverPrice) {
-                const investment = dashboardData.investments.find(i => i.name === 'Silver');
-                if (investment) {
-                    investment.value = '$' + liveData.silverPrice.current.toLocaleString(undefined, { maximumFractionDigits: 2 });
-                    investment.liveSource = 'FRED';
+                
+                // Platinum
+                if (liveData.yahoo.platinum) {
+                    let investment = dashboardData.investments.find(i => i.name === 'Platinum');
+                    if (!investment) {
+                        dashboardData.investments.splice(2, 0, {
+                            name: 'Platinum',
+                            value: '$0',
+                            momChange: '0%',
+                            yoyChange: 'N/A'
+                        });
+                        investment = dashboardData.investments.find(i => i.name === 'Platinum');
+                    }
+                    if (investment) {
+                        investment.value = '$' + liveData.yahoo.platinum.current.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                        if (liveData.yahoo.platinum.changePercent !== undefined) {
+                            investment.momChange = (liveData.yahoo.platinum.changePercent >= 0 ? '+' : '') + liveData.yahoo.platinum.changePercent.toFixed(1) + '%';
+                        }
+                        investment.liveSource = 'Yahoo';
+                    }
+                }
+                
+                // S&P 500
+                if (liveData.yahoo.sp500) {
+                    const investment = dashboardData.investments.find(i => i.name === 'S&P 500');
+                    if (investment) {
+                        investment.value = '$' + liveData.yahoo.sp500.current.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                        if (liveData.yahoo.sp500.changePercent !== undefined) {
+                            investment.momChange = (liveData.yahoo.sp500.changePercent >= 0 ? '+' : '') + liveData.yahoo.sp500.changePercent.toFixed(1) + '%';
+                        }
+                        investment.liveSource = 'Yahoo';
+                    }
+                }
+                
+                // Dow Jones
+                if (liveData.yahoo.dowJones) {
+                    const investment = dashboardData.investments.find(i => i.name === 'Dow Jones');
+                    if (investment) {
+                        investment.value = '$' + liveData.yahoo.dowJones.current.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                        if (liveData.yahoo.dowJones.changePercent !== undefined) {
+                            investment.momChange = (liveData.yahoo.dowJones.changePercent >= 0 ? '+' : '') + liveData.yahoo.dowJones.changePercent.toFixed(1) + '%';
+                        }
+                        investment.liveSource = 'Yahoo';
+                    }
+                }
+                
+                // VIX
+                if (liveData.yahoo.vix) {
+                    let vixInvestment = dashboardData.investments.find(i => i.name === 'VIX (Volatility)');
+                    if (!vixInvestment) {
+                        dashboardData.investments.push({
+                            name: 'VIX (Volatility)',
+                            value: '0',
+                            momChange: 'N/A',
+                            yoyChange: 'N/A'
+                        });
+                        vixInvestment = dashboardData.investments.find(i => i.name === 'VIX (Volatility)');
+                    }
+                    if (vixInvestment) {
+                        vixInvestment.value = liveData.yahoo.vix.current.toFixed(2);
+                        if (liveData.yahoo.vix.changePercent !== undefined) {
+                            vixInvestment.momChange = (liveData.yahoo.vix.changePercent >= 0 ? '+' : '') + liveData.yahoo.vix.changePercent.toFixed(1) + '%';
+                        }
+                        vixInvestment.liveSource = 'Yahoo';
+                    }
                 }
             }
             
